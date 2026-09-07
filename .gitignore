@@ -1,0 +1,7 @@
+# Local implementation plans and planning documents.
+/docs/
+/bin/
+/coverage.out
+*.db
+*.db-shm
+*.db-wal

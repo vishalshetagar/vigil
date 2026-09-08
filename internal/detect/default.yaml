@@ -1,0 +1,32 @@
+version: 1
+rules:
+  - id: VIGIL-001
+    version: 1
+    kind: server_shell
+    severity: high
+    executables: [sh, bash, dash, zsh]
+    ancestors: [nginx, apache2, httpd, postgres, mysqld]
+    window_seconds: 30
+    cooldown_seconds: 60
+  - id: VIGIL-002
+    version: 1
+    kind: temp_exec
+    severity: medium
+    directories: [/tmp, /var/tmp, /dev/shm]
+    window_seconds: 30
+    cooldown_seconds: 60
+  - id: VIGIL-003
+    version: 1
+    kind: shell_connect
+    severity: medium
+    executables: [sh, bash, dash, zsh, python, python3, perl, ruby]
+    window_seconds: 30
+    cooldown_seconds: 60
+  - id: VIGIL-004
+    version: 1
+    kind: download_exec
+    severity: medium
+    executables: [curl, wget]
+    directories: [/tmp, /var/tmp, /dev/shm]
+    window_seconds: 30
+    cooldown_seconds: 60

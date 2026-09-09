@@ -42,7 +42,6 @@ const (
 	sensorProgOnExec         = "on_exec"
 	sensorProgOnExit         = "on_exit"
 	sensorProgOnFork         = "on_fork"
-	sensorVarSensorPid       = "sensor_pid"
 )
 
 // loadSensor returns the embedded CollectionSpec for sensor.
@@ -107,7 +106,6 @@ type sensorMapSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type sensorVariableSpecs struct {
-	SensorPid *ebpf.VariableSpec `ebpf:"sensor_pid"`
 }
 
 // sensorObjects contains all objects after they have been loaded into the kernel.
@@ -147,7 +145,6 @@ func (m *sensorMaps) Close() error {
 //
 // It can be passed to loadSensorObjects or ebpf.CollectionSpec.LoadAndAssign.
 type sensorVariables struct {
-	SensorPid *ebpf.Variable `ebpf:"sensor_pid"`
 }
 
 // sensorPrograms contains all programs after they have been loaded into the kernel.

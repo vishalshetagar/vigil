@@ -43,13 +43,11 @@ struct pending_connect {
     __u8 address[16];
 };
 struct {
-    __uint(type, BPF_MAP_TYPE_LRU_HASH);
+    __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 16384);
     __type(key, __u64);
     __type(value, struct pending_connect);
 } connects SEC(".maps");
-
-const volatile __u32 sensor_pid = 0;
 
 static __always_inline struct vigil_stats *counters(void) {
     __u32 zero = 0;
@@ -61,8 +59,6 @@ static __always_inline __u64 birth(struct task_struct *task) {
 }
 
 static __always_inline struct vigil_event *new_event(__u16 type, struct task_struct *task) {
-    if (BPF_CORE_READ(task, tgid) == sensor_pid)
-        return 0;
     struct vigil_stats *s = counters();
     struct vigil_event *e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
     if (!e) {
@@ -82,7 +78,8 @@ static __always_inline struct vigil_event *new_event(__u16 type, struct task_str
     e->parent_start_ns = birth(parent);
     e->uid = BPF_CORE_READ(task, cred, uid.val);
     e->gid = BPF_CORE_READ(task, cred, gid.val);
-    e->cgroup = bpf_get_current_cgroup_id();
+    // A fork hook runs in the parent; its cgroup need not be the child's.
+    if (type != EVENT_FORK) e->cgroup = bpf_get_current_cgroup_id();
     e->cpu = bpf_get_smp_processor_id();
     if (BPF_CORE_READ_STR_INTO(&e->comm, task, comm) < 0) {
         e->flags |= FLAG_READ_ERROR;
@@ -138,7 +135,6 @@ struct syscall_exit { __u64 common; __s64 nr; __s64 ret; };
 SEC("tracepoint/syscalls/sys_enter_connect")
 int on_connect_enter(struct syscall_enter *ctx) {
     __u64 id = bpf_get_current_pid_tgid();
-    if ((id >> 32) == sensor_pid) return 0;
     bpf_map_delete_elem(&connects, &id);
     void *address = (void *)ctx->args[1];
     __u32 len = ctx->args[2];

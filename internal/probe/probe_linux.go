@@ -16,10 +16,11 @@ import (
 )
 
 type Collector struct {
-	objects sensorObjects
-	links   []link.Link
-	reader  *ringbuf.Reader
-	once    sync.Once
+	objects    sensorObjects
+	links      []link.Link
+	reader     *ringbuf.Reader
+	once       sync.Once
+	detachOnce sync.Once
 }
 
 func Open() (_ *Collector, err error) {
@@ -34,9 +35,6 @@ func Open() (_ *Collector, err error) {
 	}
 	spec, err := loadSensor()
 	if err != nil {
-		return nil, err
-	}
-	if err = spec.Variables["sensor_pid"].Set(uint32(os.Getpid())); err != nil {
 		return nil, err
 	}
 	if err = spec.LoadAndAssign(&c.objects, nil); err != nil {
@@ -98,16 +96,29 @@ func (c *Collector) Stop() {
 		_ = c.reader.Close()
 	}
 }
-func (c *Collector) Close() {
-	c.once.Do(func() {
-		c.Stop()
+
+// Drain detaches producers, then wakes the reader after all pending records.
+func (c *Collector) Drain() error {
+	c.detach()
+	return c.reader.Flush()
+}
+func (c *Collector) detach() {
+	c.detachOnce.Do(func() {
 		for i := len(c.links) - 1; i >= 0; i-- {
 			_ = c.links[i].Close()
 		}
+	})
+}
+func (c *Collector) Close() {
+	c.once.Do(func() {
+		c.detach()
+		c.Stop()
 		_ = c.objects.Close()
 	})
 }
-func IsClosed(err error) bool { return errors.Is(err, ringbuf.ErrClosed) }
+func IsClosed(err error) bool {
+	return errors.Is(err, ringbuf.ErrClosed) || errors.Is(err, ringbuf.ErrFlushed)
+}
 
 func Doctor() []Check {
 	checks := []Check{{"platform", true, "linux/amd64"}}

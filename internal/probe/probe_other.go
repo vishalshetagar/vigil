@@ -12,6 +12,7 @@ func Open() (*Collector, error)          { return nil, errPlatform }
 func (*Collector) Read() ([]byte, error) { return nil, errPlatform }
 func (*Collector) Stats() (Stats, error) { return Stats{}, errPlatform }
 func (*Collector) Stop()                 {}
+func (*Collector) Drain() error          { return errPlatform }
 func (*Collector) Close()                {}
 func IsClosed(error) bool                { return false }
 func Doctor() []Check                    { return []Check{{"platform", false, errPlatform.Error()}} }

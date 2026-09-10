@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"net/netip"
 )
 
@@ -99,7 +100,7 @@ func (e Event) Validate() error {
 	if !validPart(e.Host) || !validPart(e.Boot) || !validPart(e.Run) {
 		return errors.New("host, boot and run must be bounded identifier strings")
 	}
-	if e.ID == "" || len(e.ID) > 256 || e.TimeNS == 0 {
+	if e.ID == "" || len(e.ID) > 256 || e.TimeNS == 0 || e.TimeNS > math.MaxInt64 {
 		return errors.New("event requires id and positive monotonic time")
 	}
 	if len(e.Comm) > 64 || len(e.Filename) > 4096 || len(e.GapReason) > 1024 {

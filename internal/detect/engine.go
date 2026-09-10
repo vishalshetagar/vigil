@@ -98,6 +98,8 @@ func (e *Engine) Process(ev event.Event) (*process.Node, []event.Alert, error) {
 	e.Stats.Events++
 	if ev.TimeNS < e.clock {
 		e.Stats.Late++
+		e.degraded = true
+		clear(e.downloads)
 		return nil, nil, nil
 	}
 	e.clock = ev.TimeNS

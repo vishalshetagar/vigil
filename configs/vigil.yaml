@@ -1,0 +1,11 @@
+# Install to /etc/vigil/config.yaml. All queues and retained records are bounded.
+database: /var/lib/vigil/history.db
+socket: /run/vigil/vigil.sock
+rules: "" # Empty uses the embedded default ruleset.
+queue_size: 8192
+batch_size: 256
+flush_ms: 100
+max_processes: 32768
+max_rule_state: 10000
+max_events: 50000
+max_alerts: 10000

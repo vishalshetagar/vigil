@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -34,6 +36,38 @@ type Counts struct {
 	Events    int `json:"events"`
 	Processes int `json:"processes"`
 	Alerts    int `json:"alerts"`
+}
+
+// OpenReadOnly never creates a database or performs migrations.
+func OpenReadOnly(filename string) (*Store, error) {
+	abs, err := filepath.Abs(filename)
+	if err != nil {
+		return nil, err
+	}
+	uriPath := filepath.ToSlash(abs)
+	if !strings.HasPrefix(uriPath, "/") {
+		uriPath = "/" + uriPath
+	}
+	u := url.URL{Scheme: "file", Path: uriPath, RawQuery: "mode=ro"}
+	db, err := sql.Open("sqlite", u.String())
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(1)
+	if _, err = db.Exec("PRAGMA busy_timeout=3000"); err != nil {
+		db.Close()
+		return nil, err
+	}
+	var version int
+	if err = db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if version != 1 {
+		db.Close()
+		return nil, fmt.Errorf("unsupported database schema %d", version)
+	}
+	return &Store{db: db}, nil
 }
 
 func Open(filename string, maxEvents, maxAlerts int) (*Store, error) {

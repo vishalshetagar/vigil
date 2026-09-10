@@ -3,7 +3,9 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"vigil/internal/event"
@@ -68,5 +70,53 @@ func TestAtomicRollback(t *testing.T) {
 	c, _ := s.Counts(context.Background())
 	if c.Events != 0 || c.Alerts != 0 {
 		t.Fatal("partial transaction", c)
+	}
+}
+
+func TestReadOnlyMissingAndFutureSchema(t *testing.T) {
+	name := filepath.Join(t.TempDir(), "missing.db")
+	if s, err := OpenReadOnly(name); err == nil {
+		s.Close()
+		t.Fatal("created missing database")
+	}
+	s, err := Open(name, 10, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.db.Exec("PRAGMA user_version=99"); err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	if s, err = Open(name, 10, 10); err == nil {
+		s.Close()
+		t.Fatal("accepted future schema")
+	}
+}
+
+func TestDiskBudgetRollback(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "full.db"), 100, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	var pages int
+	if err = s.db.QueryRow("PRAGMA page_count").Scan(&pages); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.db.Exec(fmt.Sprintf("PRAGMA max_page_count=%d", pages)); err != nil {
+		t.Fatal(err)
+	}
+	var records []Record
+	for i := 0; i < 50; i++ {
+		r := record(fmt.Sprint(i), uint64(i+1))
+		r.Event.Filename = "/tmp/" + strings.Repeat("a", 3000)
+		records = append(records, r)
+	}
+	if err = s.Write(context.Background(), records); err == nil {
+		t.Fatal("expected storage budget failure")
+	}
+	c, err := s.Counts(context.Background())
+	if err != nil || c.Events != 0 || c.Alerts != 0 {
+		t.Fatal("failed batch partially committed", c, err)
 	}
 }

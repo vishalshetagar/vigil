@@ -1,0 +1,28 @@
+[Unit]
+Description=Vigil Linux endpoint security sensor
+After=local-fs.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/local/bin/vigil run --config /etc/vigil/config.yaml
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+StateDirectory=vigil
+StateDirectoryMode=0700
+RuntimeDirectory=vigil
+RuntimeDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+RestrictSUIDSGID=yes
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

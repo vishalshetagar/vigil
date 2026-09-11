@@ -1,0 +1,48 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.3'
+          cache: true
+      - run: go mod verify
+      - run: go test ./...
+      - run: go vet ./...
+      - if: runner.os == 'Linux'
+        run: go test -race ./...
+      - run: go build ./cmd/vigil
+
+  kernel:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.3'
+          cache: true
+      - name: Install BPF build headers and compiler
+        run: sudo apt-get update && sudo apt-get install -y clang llvm libbpf-dev
+      - name: Regenerate and build
+        run: |
+          go generate ./internal/probe
+          go build -o bin/vigil ./cmd/vigil
+          go test -race -c -o bin/integration.test ./tests/integration
+      - name: Check kernel capabilities
+        run: sudo ./bin/vigil doctor
+      - name: Run privileged kernel integration
+        working-directory: tests/integration
+        run: sudo env VIGIL_INTEGRATION=1 ../../bin/integration.test -test.v -test.timeout=60s

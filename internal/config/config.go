@@ -14,6 +14,7 @@ type Config struct {
 	Socket       string `yaml:"socket"`
 	Rules        string `yaml:"rules"`
 	QueueSize    int    `yaml:"queue_size"`
+	RingBytes    uint32 `yaml:"ring_bytes"`
 	BatchSize    int    `yaml:"batch_size"`
 	FlushMS      int    `yaml:"flush_ms"`
 	MaxProcesses int    `yaml:"max_processes"`
@@ -23,7 +24,7 @@ type Config struct {
 }
 
 func Default() Config {
-	return Config{Database: "/var/lib/vigil/history.db", Socket: "/run/vigil/vigil.sock", QueueSize: 8192, BatchSize: 256, FlushMS: 100, MaxProcesses: 32768, MaxRuleState: 10000, MaxEvents: 50000, MaxAlerts: 10000}
+	return Config{Database: "/var/lib/vigil/history.db", Socket: "/run/vigil/vigil.sock", RingBytes: 16 << 20, QueueSize: 8192, BatchSize: 256, FlushMS: 100, MaxProcesses: 32768, MaxRuleState: 10000, MaxEvents: 50000, MaxAlerts: 10000}
 }
 func Load(filename string) (Config, error) {
 	c := Default()
@@ -50,6 +51,9 @@ func Load(filename string) (Config, error) {
 }
 
 func (c Config) Validate() error {
+	if c.RingBytes < 4096 || c.RingBytes > 256<<20 || c.RingBytes&(c.RingBytes-1) != 0 {
+		return fmt.Errorf("ring_bytes must be a power of two from 4096 to 268435456")
+	}
 	if c.Database == "" || c.Socket == "" {
 		return fmt.Errorf("database and socket paths are required")
 	}

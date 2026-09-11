@@ -325,3 +325,55 @@ func TestLivePipelineAndRestart(t *testing.T) {
 		t.Fatal("alerts not durable", err, len(rows))
 	}
 }
+
+func TestRingPressureIsCountedAndDrains(t *testing.T) {
+	requireKernel(t)
+	c, err := probe.OpenWithRingSize(4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	// Intentionally leave the reader idle while a benign workload fills the ring.
+	for i := 0; i < 30; i++ {
+		if err := exec.Command("/bin/true").Run(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s, err := c.Stats()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.RingLost == 0 {
+		t.Fatal("pressure did not produce a loss counter")
+	}
+	t.Logf("pressure counters: %+v", s)
+	if err = c.Drain(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		for {
+			b, err := c.Read()
+			if probe.IsClosed(err) {
+				done <- nil
+				return
+			}
+			if err != nil {
+				done <- err
+				return
+			}
+			if _, err = event.Decode(b); err != nil {
+				done <- err
+				return
+			}
+		}
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("full ring did not drain")
+	}
+}

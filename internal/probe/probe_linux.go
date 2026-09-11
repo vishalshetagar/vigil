@@ -23,7 +23,12 @@ type Collector struct {
 	detachOnce sync.Once
 }
 
-func Open() (_ *Collector, err error) {
+func Open() (*Collector, error) { return OpenWithRingSize(16 << 20) }
+
+func OpenWithRingSize(size uint32) (_ *Collector, err error) {
+	if size < 4096 || size > 256<<20 || size&(size-1) != 0 {
+		return nil, fmt.Errorf("ring size must be a power of two from 4096 to 268435456 bytes")
+	}
 	c := &Collector{}
 	defer func() {
 		if err != nil {
@@ -37,6 +42,7 @@ func Open() (_ *Collector, err error) {
 	if err != nil {
 		return nil, err
 	}
+	spec.Maps["events"].MaxEntries = size
 	if err = spec.LoadAndAssign(&c.objects, nil); err != nil {
 		return nil, fmt.Errorf("load BPF programs (need BTF and BPF permissions): %w", err)
 	}

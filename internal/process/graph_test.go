@@ -51,3 +51,18 @@ func TestLateEventAndBoundedAncestry(t *testing.T) {
 		t.Fatal("unbounded graph")
 	}
 }
+
+func TestCreatorSurvivesReparenting(t *testing.T) {
+	g := New(10)
+	e := sample(3, 1, 10, event.Fork)
+	e.Run = "r"
+	e.Parent = event.Identity{PID: 2, StartNS: 1}
+	g.Apply(e)
+	e.Type = event.Exec
+	e.TimeNS = 20
+	e.Parent = event.Identity{PID: 1, StartNS: 1}
+	n := g.Apply(e)
+	if n.ParentKey != "host/boot/2/1" || n.Run != "r" {
+		t.Fatal("creator/run changed", n)
+	}
+}

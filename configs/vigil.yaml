@@ -3,6 +3,7 @@ database: /var/lib/vigil/history.db
 socket: /run/vigil/vigil.sock
 rules: "" # Empty uses the embedded default ruleset.
 queue_size: 8192
+ring_bytes: 16777216
 batch_size: 256
 flush_ms: 100
 max_processes: 32768

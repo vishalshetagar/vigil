@@ -95,7 +95,13 @@ int on_fork(struct bpf_raw_tracepoint_args *ctx) {
     // Threads share a process instance and do not create new process graph nodes.
     if (BPF_CORE_READ(child, pid) != BPF_CORE_READ(child, tgid)) return 0;
     struct vigil_event *e = new_event(EVENT_FORK, child);
-    if (e) bpf_ringbuf_submit(e, 0);
+    if (e) {
+        // CLONE_PARENT can make real_parent differ from the task that created it.
+        struct task_struct *creator = (void *)ctx->args[0];
+        e->ppid = BPF_CORE_READ(creator, tgid);
+        e->parent_start_ns = birth(creator);
+        bpf_ringbuf_submit(e, 0);
+    }
     return 0;
 }
 

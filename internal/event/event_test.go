@@ -33,6 +33,9 @@ func TestDecode(t *testing.T) {
 func FuzzDecode(f *testing.F) {
 	f.Add(make([]byte, WireSize))
 	f.Add([]byte{1, 2})
+	var valid bytes.Buffer
+	_ = binary.Write(&valid, binary.LittleEndian, Wire{Version: 1, Type: 4, Size: WireSize, TimeNS: 1, PID: 2, StartNS: 1, Family: 10})
+	f.Add(valid.Bytes())
 	f.Fuzz(func(t *testing.T, b []byte) { _, _ = Decode(b) })
 }
 

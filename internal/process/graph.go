@@ -8,6 +8,7 @@ import (
 
 type Node struct {
 	Key        string         `json:"key"`
+	Run        string         `json:"run"`
 	Identity   event.Identity `json:"identity"`
 	ParentKey  string         `json:"parent_key,omitempty"`
 	Comm       string         `json:"comm,omitempty"`
@@ -52,7 +53,7 @@ func (g *Graph) Apply(e event.Event) *Node {
 			g.order.Remove(oldest)
 			g.Evictions++
 		}
-		n := &Node{Key: key, Identity: e.Process, ParentKey: e.ParentKey(), FirstNS: e.TimeNS, Partial: e.Type != event.Fork}
+		n := &Node{Key: key, Run: e.Run, Identity: e.Process, ParentKey: e.ParentKey(), FirstNS: e.TimeNS, Partial: e.Type != event.Fork}
 		x = entry{n, g.order.PushBack(key)}
 		g.nodes[key] = x
 	}

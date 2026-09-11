@@ -30,6 +30,7 @@ type Status struct {
 	Malformed      uint64       `json:"malformed"`
 	GraphEvictions uint64       `json:"graph_evictions"`
 	Persisted      uint64       `json:"persisted"`
+	Uncommitted    uint64       `json:"uncommitted"`
 	Limitations    []string     `json:"limitations"`
 }
 
@@ -88,7 +89,7 @@ func Live(ctx context.Context, cfg config.Config, set detect.Ruleset, onAlert fu
 		return final, err
 	}
 	defer server.Close()
-	collector, err := probe.Open()
+	collector, err := probe.OpenWithRingSize(cfg.RingBytes)
 	if err != nil {
 		return final, err
 	}
@@ -160,6 +161,19 @@ func Live(ctx context.Context, cfg config.Config, set detect.Ruleset, onAlert fu
 		if len(batch) == 0 {
 			return nil
 		}
+		// Loss counters can change before the next periodic gap record. Conservatively
+		// annotate alerts at commit, rather than presenting them as complete evidence.
+		s, statsErr := collector.Stats()
+		if statsErr != nil {
+			return statsErr
+		}
+		if s.RingLost+s.MapErrors+s.ReadErrors+queueDrops.Load()+malformed.Load() > 0 {
+			for i := range batch {
+				for j := range batch[i].Alerts {
+					batch[i].Alerts[j].Coverage = append(batch[i].Alerts[j].Coverage, "collection counters indicate missing or incomplete telemetry")
+				}
+			}
+		}
 		commitCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := db.Write(commitCtx, batch); err != nil {
@@ -211,6 +225,7 @@ func Live(ctx context.Context, cfg config.Config, set detect.Ruleset, onAlert fu
 		h.value.Malformed = malformed.Load()
 		h.value.GraphEvictions = engine.Graph.Evictions
 		h.value.State = "stopped"
+		h.value.Uncommitted = engine.Stats.Events - h.value.Persisted
 		if err != nil {
 			h.value.State = "failed"
 		}
